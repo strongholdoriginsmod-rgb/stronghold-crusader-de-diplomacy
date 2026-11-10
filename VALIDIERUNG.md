@@ -1,4 +1,64 @@
-# Prüfnachweise zum Hauptzweig
+# Prüfnachweise
+
+## Regulärer Entwicklungsstand mit APIShared 0.44.0
+
+Der reguläre Build und die getrennte Diagnosevariante wurden gegen denselben
+vollständig geprüften APIShared-Build kompiliert. Beide verwenden für
+Truppenbefehle ausschließlich den gemeinsamen Eingabebroker.
+
+In einem Einzelspielergefecht mit BugfixesAndQoL, SerpsMods und Fixes
+wählte der Script Extender eine eigene Einheit aus. Der Broker meldete
+dabei null Befehlseingaben und die aktive Waffenruhe blieb bestehen.
+
+Ein neuer Spielprozess lud einen Gefechtsstand mit aktiver Waffenruhe.
+Vanillas Zielerkennung bestätigte das Ziel unter dem tatsächlichen Mauszeiger.
+Ein über das Windows-Spielfenster zugestellter Rechtsklick brach die Waffenruhe
+genau einmal. Der native Originalaufruf und die Befehlsdaten der ausgewählten
+Einheit bestätigten die Ziel-ID und die globale Ziel-ID der Testeinheit.
+
+Mit BugfixesAndQoL, SerpsMods und Fixes bestätigte der gemeinsame
+Save-Beobachter genau einen erfolgreichen Originalaufruf. Diplomatie
+fand die Bytes seines SaveData-Callbacks unverändert im Archiv. Zwei
+verschachtelte, vor dem Original abgebrochene Aufrufe erzeugten keine
+Datei und entwerteten den alten Nachweis. In einem frischen Prozess
+stellte Diplomatie den Testeintrag ohne Begleitmods genau einmal wieder
+her. Beim folgenden Kartenwechsel wurde die alte Sitzung verworfen.
+
+Im lokalen Gefecht auf Crater Lake nahm Vanilla genau einen unveränderten Verteidigungsbefehl von Spieler 1 an den verbündeten Sultan (Spieler 2) an. Die Diagnose sah einen Evaluatoraufruf mit Erfolg und danach den neuen nativen Auftrag mit passendem Absender. Ein veraltetes und ein nachträglich verändertes Ticket erreichten den Evaluator nicht. Dieser erste Nachweis verwendete ein direkt eingereihtes Diagnoseticket.
+
+Im folgenden Einzelspieler-Test wurde „Verteidigen“ über die sichtbare
+Noesis-Schaltfläche des Verbündeten-HUD ausgelöst. Ein Klick erzeugte einen
+Originalaufruf und genau einen neuen nativen Verteidigungsauftrag. Mit der
+freigeschalteten Diplomatie-Weiterleitung und BugfixesAndQoL, SerpsMods,
+Spectator und Fixes wurde der sofortige Aufruf einmal abgefangen. Der
+weitergeleitete Aufruf erzeugte genau eine erfolgreiche native Auswertung
+und einen dazu passenden neuen Auftrag. Kaltladen und Kartenwechsel mit
+denselben Begleitmods verwarfen alte Tickets und behielten die geprüfte
+Freigabe für die neue Karte. Der Runner stellte die temporär ersetzten
+Dateien und Einstellungen wieder her.
+
+## Regulärer Entwicklungsstand mit APIShared 0.43.0
+
+Der reguläre Build wurde mit APIShared 0.43.0 geprüft. In einem Einzelspieler-
+Gefechtsstand wurde eine aktive Waffenruhe über den normalen Save-Pfad
+gespeichert und in einem frischen Prozess wiederhergestellt. Mit
+BugfixesAndQoL, SerpsMods und Fixes löste ein Rechtsklick auf eine von
+Vanilla erkannte Zieleinheit genau einen Vertragsbruch aus. Der native
+Originalaufruf und der Angriffsbefehl der ausgewählten Einheit bestätigten
+dieselbe Zieleinheit.
+
+BugfixesAndQoL wurde zusätzlich mit natürlichen Raubtiergruppen geprüft.
+Während der globalen Friedenszeit blieb der beobachtete Nahkampfschaden aus.
+Nach Ablauf bestätigte der native Schadenspfad einen Treffer mit
+Gesundheitsverlust. Beide Ergebnisse wurden mit und ohne Fixes beobachtet.
+
+In einem separaten Gefecht mit drei nativen Teams blieb die Waffenruhe mit
+KI 2 nach Ablauf der globalen Friedenszeit aktiv. Vanilla nahm einen über
+den Script Extender erteilten Angriffsbefehl gegen die unbeteiligte KI 3 an.
+Die Ziel-ID des nativen Auftrags und der Projektiltreffer stimmten überein.
+Die Gesundheit der Zieleinheit sank von 50.000 auf 47.900.
+
+## Historische Prüfnachweise zur Vorabversion
 
 ## Build
 

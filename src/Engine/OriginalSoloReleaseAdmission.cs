@@ -17,6 +17,7 @@ namespace StrongholdEuropeDE.Runtime
         internal bool OriginalManagedGameMethods { get; set; }
         internal bool OriginalRawraMethods { get; set; }
         internal bool ManagedDependenciesAreLoaded { get; set; }
+        internal string ManagedDependencyFailure { get; set; }
         internal bool ExactOneHumanAndNoRemotePeer { get; set; }
         internal bool OriginalMapAndRosterCurrent { get; set; }
         internal bool ExclusiveEngineMonitorHeld { get; set; }
@@ -47,7 +48,7 @@ namespace StrongholdEuropeDE.Runtime
             if (!x.OriginalRawraMethods)
                 { reason = "managed_rawra_methods_not_pinned"; return false; }
             if (!x.ManagedDependenciesAreLoaded)
-                { reason = "public_apishared_0163_and_rawra_dependencies_not_loaded"; return false; }
+                { reason = x.ManagedDependencyFailure ?? "managed_dependencies_not_loaded"; return false; }
             if (!x.ExactOneHumanAndNoRemotePeer)
                 { reason = "original_solo_registers_or_remote_peer_unverified"; return false; }
             if (!x.OriginalMapAndRosterCurrent)
@@ -122,6 +123,7 @@ namespace StrongholdEuropeDE.Runtime
                         VerifiedManagedSurface.VerifyRawraAssembly(out diagnostic);
                     f.ManagedDependenciesAreLoaded =
                         SerpsRawraCompat.CheckLoadedBepInExDependencies(out diagnostic);
+                    f.ManagedDependencyFailure = f.ManagedDependenciesAreLoaded ? null : diagnostic;
                     f.ExactOneHumanAndNoRemotePeer =
                         IsSoloEngineSession(out diagnostic);
                     f.OriginalMapAndRosterCurrent = !string.IsNullOrEmpty(_mapFingerprint) &&

@@ -23,6 +23,11 @@ namespace StrongholdEuropeDE.Runtime
             }
         }
 
+        internal bool MatchesOperands(int originalOpcode, int originalConsulted, int originalTarget,
+            int finalOpcode, int finalConsulted, int finalTarget) =>
+            originalOpcode == Opcode && originalConsulted == Consulted && originalTarget == Target &&
+            finalOpcode == Opcode && finalConsulted == Consulted && finalTarget == Target;
+
         internal static bool TryCreate(int requester, int consulted, int opcode, int target, out HumanAllyMilitaryRequest request, out string reason)
         {
             request = null;
@@ -144,12 +149,32 @@ namespace StrongholdEuropeDE.Runtime
 
     internal static class OriginalHumanAllyOrderRules
     {
+#if !DIPLOMACY_PRIVATE_TESTS
+        // Retire a foreign session without publishing an expiry. The slot identity
+        // also prevents a competing decision from being replaced by a timeout.
+        internal static bool TryClaimReplyTimeout<T>(ref T slot, T expected,
+            long dispatchedSession, long currentSession, int? elapsed) where T : class
+        {
+            bool current = dispatchedSession > 0 && dispatchedSession == currentSession;
+            if (current && !(elapsed >= 256))
+                return false;
+            return ReferenceEquals(System.Threading.Interlocked.CompareExchange(ref slot, null, expected), expected) &&
+                current;
+        }
+#endif
+
         internal const int OriginalAllyOrdersCommand = 1061;
         internal const long LastUsableOriginalTick = (long)int.MaxValue - 4096;
         internal static bool Slot(int p)
         {
             return p >= 1 && p <= 8;
         }
+
+        internal static bool HasPositiveCommonTeam(int requesterTeam, int consultedTeam) =>
+            requesterTeam > 0 && requesterTeam == consultedTeam;
+
+        internal static bool TryClaimDispatch(ref int claim) =>
+            System.Threading.Interlocked.Exchange(ref claim, 1) == 0;
 
         internal static bool ValidTick(long tick)
         {

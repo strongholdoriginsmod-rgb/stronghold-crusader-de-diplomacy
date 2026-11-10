@@ -1,3 +1,23 @@
+# Änderungen im regulären Entwicklungsstand
+
+- Der reguläre Build benötigt APIShared 0.44.0. Diplomatie erhält
+  Eingaben für Truppenbefehle über den gemeinsamen Broker und veröffentlicht
+  geschützte Spielerpaare für den gemeinsamen nativen Zielwahlfilter.
+- Ein Angriffsklick auf einen Vertragspartner kann die Waffenruhe beenden
+  und den passenden Originalbefehl auslösen. Aktive Waffenruhen werden beim
+  Laden eines Spielstands wiederhergestellt.
+- Im lokalen Gefecht leitet Diplomatie „Verteidigen“ aus dem
+  Verbündetenfenster einmal an Vanilla weiter. Die KI entscheidet weiterhin,
+  ob sie den Auftrag annimmt. Das Rückmeldefenster folgt der Simulationsuhr
+  der aktuellen Mission.
+- Diplomatie beobachtet den normalen Einzelspieler-Save über APIShared.
+  Speicherformat und vorhandene Save-Schutzprüfungen bleiben erhalten.
+- Der Build erzeugt die Versionsanforderung im Plugin und das passende
+  Manifest aus derselben Abhängigkeitsangabe.
+
+Die gezielten Einzelspielerprüfungen dieses Stands stehen in
+[VALIDIERUNG.md](VALIDIERUNG.md#regulärer-entwicklungsstand-mit-apishared-0440).
+
 # Diplomatie 2.3.11-preview.1
 
 Einzelspieler-Vorabversion für Stronghold Crusader Definitive Edition, Stand

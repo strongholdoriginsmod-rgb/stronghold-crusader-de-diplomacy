@@ -235,6 +235,10 @@ namespace StrongholdEuropeDE.Runtime
                 _privateSaveScope = false;
                 Log("trade_save", "status=mp_save_fence_unavailable|reason=" + Safe(e.GetType().Name));
             }
+#if !DIPLOMACY_PRIVATE_TESTS
+            if (_saveBridgeInstalled)
+                InstallSharedSoloSaveReadback();
+#endif
         }
 
         private void UninstallGameSaveBridge()
@@ -322,11 +326,13 @@ namespace StrongholdEuropeDE.Runtime
                 }
             }
 
-            // Normal solo continues the ORIGINAL engine's save unchanged.
-            // original save readback observes only. It never rewrites __0 or __result.
+            // The public solo observer lives in APIShared. Private QA keeps the
+            // original readback path for its disposable normal-save diagnostic.
             if (!owner._privateSaveScope)
             {
-                owner.ObserveOriginalSoloSavePrefix(__0,__7);
+#if DIPLOMACY_PRIVATE_TESTS
+                owner.PrepareOriginalSoloSaveWitness(__0, __7, new OriginalSaveWitness());
+#endif
                 return true;
             }
             if (__7)
@@ -366,12 +372,12 @@ namespace StrongholdEuropeDE.Runtime
         {
             if (__state == null)
             {
-                // Never alter original GameSave result, native file or path.
-                // A passive normal-Solo readback is diagnostic ONLY.
+#if DIPLOMACY_PRIVATE_TESTS
                 DiplomacyFeature savedOwner;
                 lock (OwnerGate) { savedOwner = _activeOwner; }
                 if (savedOwner != null)
-                    savedOwner.ObserveOriginalSoloSavePostfix(__0,__result);
+                    savedOwner.ObservePrivateSoloSaveCompletion(__0, __result);
+#endif
                 return;
             }
             var c = __state;

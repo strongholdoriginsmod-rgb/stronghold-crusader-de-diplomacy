@@ -166,13 +166,15 @@ namespace StrongholdEuropeDE.Runtime
                 String.IsNullOrEmpty(_rosterFingerprint))
                 return false;
             GameData game = GameData.Instance;
-            if (game == null || game.lastGameState == null ||
-                game.playerID != _localPlayer || game.SkirmishGameType != 0 ||
-                game.coopTrailID != 0)
+            if (game == null || game.lastGameState == null || game.playerID != _localPlayer)
                 return false;
-            // Original solo saves can report network transport with no local host.
-            // The full solo policy verifies the managed and native rosters.
-            return !GameNetworkAPI.IsLobbyEnvironment();
+#if DIPLOMACY_PRIVATE_TESTS
+            return game.SkirmishGameType == 0 && game.coopTrailID == 0 &&
+                !GameNetworkAPI.IsLobbyEnvironment();
+#else
+            // The periodic solo proof still verifies the managed and native rosters.
+            return IsCurrentPublicSoloMission(_missionLifecycle?.Current);
+#endif
         }
 
         private void ResetLordChatSession()

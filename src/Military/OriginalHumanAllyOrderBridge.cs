@@ -99,17 +99,15 @@ namespace StrongholdEuropeDE.Runtime
                 RequesterAlliedToConsulted = api.IsPlayerAlliedTo(r.Requester, r.Consulted),
                 ConsultedAlliedToRequester = api.IsPlayerAlliedTo(r.Consulted, r.Requester)
             };
-#if DIPLOMACY_PRIVATE_TESTS
             // A neutral team-zero equality is NOT a real native human-AI alliance.
             // The positive original team allows the existing order path to run.
             int originalHumanTeam = api.GetPlayerTeam(r.Requester);
             int originalAiTeam = api.GetPlayerTeam(r.Consulted);
-            if (originalHumanTeam <= 0 || originalAiTeam != originalHumanTeam)
+            if (!OriginalHumanAllyOrderRules.HasPositiveCommonTeam(originalHumanTeam, originalAiTeam))
             {
                 reason = "original_native_positive_team_alliance_missing";
                 return false;
             }
-#endif
             if (r.IsAttack)
             {
                 f.TargetAlive = Alive(snapshot, r.Target);
@@ -128,6 +126,7 @@ namespace StrongholdEuropeDE.Runtime
             reason = "original_order_snapshot_unavailable";
             if (!OriginalHumanAllyOrderRules.Slot(consulted) || s == null || s.skirmish_order == null || s.skirmish_order.Length != 9 || s.skirmish_order_player == null || s.skirmish_order_player.Length != 9 || s.skirmish_order_from_player == null || s.skirmish_order_from_player.Length != 9)
                 return false;
+#if DIPLOMACY_PRIVATE_TESTS
             var clock = GameTimeManagerAPI.Instance;
             if (clock == null)
             {
@@ -136,6 +135,13 @@ namespace StrongholdEuropeDE.Runtime
             }
 
             int tick = clock.GetElapsedMapTicks();
+#else
+            if (!APIShared.Simulation.SimulationTickEvents.TryGetCurrentTick(out int tick))
+            {
+                reason = "original_clock_unavailable";
+                return false;
+            }
+#endif
             if (!OriginalHumanAllyOrderRules.ValidTick(tick))
             {
                 reason = "original_clock_unbound_or_overflow";
@@ -184,6 +190,9 @@ namespace StrongholdEuropeDE.Runtime
                 return false;
             }
         }
+
+        internal static bool CanDispatchUnderOriginalMonitor(HumanAllyMilitaryRequest request) =>
+            TryReadCurrentRoute(request, out _, out _);
 
         internal static OriginalAllyDispatchStage DispatchCurrentHumanUnderOriginalMonitor(HumanAllyMilitaryRequest request, out OriginalAllyDispatchObservation observation, out string reason)
         {

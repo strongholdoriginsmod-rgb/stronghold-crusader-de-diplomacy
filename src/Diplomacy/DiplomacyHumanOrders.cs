@@ -9,6 +9,9 @@ using SHCDESE.API;
 using SHCDESE.EventAPI.Tribes;
 using SHCDESE.Interop;
 using SHCDESE.Interop.Enums;
+#if !DIPLOMACY_PRIVATE_TESTS
+using APIShared.Units;
+#endif
 
 namespace StrongholdEuropeDE.Runtime
 {
@@ -51,7 +54,9 @@ namespace StrongholdEuropeDE.Runtime
 
         private sealed class HumanCommandFrame
         {
+#if DIPLOMACY_PRIVATE_TESTS
             internal int[] UnderCursor;
+#endif
             internal HumanWarIntent Intent;
             internal readonly HashSet<int> AllowedTribes = new HashSet<int>();
         }
@@ -60,32 +65,68 @@ namespace StrongholdEuropeDE.Runtime
         private readonly HumanWarIntent[] _humanWarIntents = new HumanWarIntent[9];
         [ThreadStatic]
         private static HumanCommandFrame _humanCommandFrame;
+#if DIPLOMACY_PRIVATE_TESTS
         private MethodInfo _troopSelectionTarget, _preDllActionsTarget, _diplomacyProbeTarget;
+
         private bool PrepareHumanOrders(out string failure)
         {
             _troopSelectionTarget = typeof(EngineInterface).GetMethod("TroopSelection", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(int), typeof(bool), typeof(bool), typeof(int[]), typeof(bool), typeof(bool), typeof(int[]), typeof(int), typeof(int), typeof(bool), typeof(int[]) }, null);
             _preDllActionsTarget = typeof(EditorDirector).GetMethod("preDLLCallActions", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(int).MakeByRefType(), typeof(int).MakeByRefType() }, null);
+            bool ready = _troopSelectionTarget != null && _troopSelectionTarget.ReturnType == typeof(void) &&
+                _preDllActionsTarget != null && _preDllActionsTarget.ReturnType == typeof(void);
             _diplomacyProbeTarget = typeof(EngineInterface).GetMethod("run", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(bool) }, null);
-            failure = _troopSelectionTarget != null && _troopSelectionTarget.ReturnType == typeof(void) && _preDllActionsTarget != null && _preDllActionsTarget.ReturnType == typeof(void) && _diplomacyProbeTarget != null && _diplomacyProbeTarget.ReturnType == typeof(int) ? null : "pinned managed human-order signatures are unavailable";
+            ready = ready && _diplomacyProbeTarget != null && _diplomacyProbeTarget.ReturnType == typeof(int);
+            failure = ready ? null : "pinned managed human-order signatures are unavailable";
             return failure == null;
         }
 
+#else
+        private static bool _sharedHumanRunRegistered, _sharedTroopInputRegistered;
+#endif
+
         private void ApplyHumanOrders()
         {
+#if DIPLOMACY_PRIVATE_TESTS
             BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
             _harmony.Patch(_troopSelectionTarget, prefix: new HarmonyMethod(typeof(DiplomacyFeature).GetMethod("TroopSelectionPrefix", flags)));
             _harmony.Patch(_preDllActionsTarget, postfix: new HarmonyMethod(typeof(DiplomacyFeature).GetMethod("PreDllActionsPostfix", flags)));
-#if DIPLOMACY_PRIVATE_TESTS && HOST_DIRECTED_AI_TRIBE_CANARY && ORIGINAL_POSTTICK_INSTALL_EXPLICITLY_AUTHORIZED
+#if HOST_DIRECTED_AI_TRIBE_CANARY && ORIGINAL_POSTTICK_INSTALL_EXPLICITLY_AUTHORIZED
             // The earlier ordered engine bridge already co-registered both
             // human-order callbacks on this target when it admitted pre-worker.
             // In that case a second Patch would rewrite a live native entry.
             if (!OriginalPreWorkerRegistration.MustRetainRunPatch)
 #endif
                 _harmony.Patch(_diplomacyProbeTarget, prefix: new HarmonyMethod(typeof(DiplomacyFeature).GetMethod("RunBegin", flags)), finalizer: new HarmonyMethod(typeof(DiplomacyFeature).GetMethod("RunEnd", flags)));
+#else
+            if (!_sharedHumanRunRegistered)
+            {
+                if (!APIShared.Simulation.EngineRunEvents.TryRegister(CompatibilityContracts.PluginId,
+                    "diplomacy-human-command-frame", ClearHumanCommandFrame, ClearHumanCommandFrame, out string reason))
+                {
+                    Log("human_orders", "status=shared_run_unavailable|reason=" + Safe(reason));
+                    return;
+                }
+                _sharedHumanRunRegistered = true;
+                Log("human_orders", "status=shared_run_registered");
+            }
+
+            if (!_sharedTroopInputRegistered)
+            {
+                if (!TroopCommandInputEvents.TryRegister(CompatibilityContracts.PluginId,
+                    "diplomacy-troop-command-input", OnSharedTroopCommandInput, out string reason))
+                {
+                    Log("human_orders", "status=shared_input_unavailable|reason=" + Safe(reason));
+                    return;
+                }
+                _sharedTroopInputRegistered = true;
+                Log("human_orders", "status=shared_input_registered");
+            }
+#endif
         }
 
         private void RollbackHumanOrders()
         {
+#if DIPLOMACY_PRIVATE_TESTS
             // Unpatch by our owner even if a later patch failed during Apply.
             if (_troopSelectionTarget != null)
                 _harmony.Unpatch(_troopSelectionTarget, HarmonyPatchType.Prefix, _harmony.Id);
@@ -104,6 +145,7 @@ namespace StrongholdEuropeDE.Runtime
                 }
             }
 
+#endif
             ClearHumanOrders();
         }
 
@@ -129,6 +171,7 @@ namespace StrongholdEuropeDE.Runtime
             Volatile.Write(ref _treatyIntentTargets, targets);
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         private static void RunBegin()
         {
             _humanCommandFrame = null;
@@ -168,13 +211,38 @@ namespace StrongholdEuropeDE.Runtime
             owner.NoteLane(LaneInput);
             try
             {
-                owner.CaptureHumanWarIntent(frame, __0, __1);
+                owner.CaptureHumanWarIntent(frame, __0, __1, frame.UnderCursor);
             }
             catch
             {
                 _humanCommandFrame = null;
             } // Never throw through the engine frame.
         }
+
+#else
+        private static void ClearHumanCommandFrame() => _humanCommandFrame = null;
+
+        private static void OnSharedTroopCommandInput(TroopCommandInput input)
+        {
+            _humanCommandFrame = null;
+            DiplomacyFeature owner = Volatile.Read(ref _activeOwner);
+            if (owner == null || !Volatile.Read(ref owner._mapActive) || Volatile.Read(ref owner._mapDisabled) ||
+                !IsNativeDiplomacySectionHeld)
+                return;
+
+            owner.NoteLane(LaneInput);
+            var frame = new HumanCommandFrame();
+            _humanCommandFrame = frame;
+            try
+            {
+                owner.CaptureHumanWarIntent(frame, input.X, input.Y, input.UnitsUnderCursor);
+            }
+            catch
+            {
+                _humanCommandFrame = null;
+            }
+        }
+#endif
 
         // SE 2.0-2.11 expose GameUnit+0x92 as byte, but Vanilla's
         // troop-command owner consumer MOVSX-reads the *signed WORD*.
@@ -217,7 +285,7 @@ namespace StrongholdEuropeDE.Runtime
             return *(ushort*)((byte*)unit + HumanNativeFields.SelectionOffset);
         }
 
-        private unsafe void CaptureHumanWarIntent(HumanCommandFrame frame, int x, int y)
+        private unsafe void CaptureHumanWarIntent(HumanCommandFrame frame, int x, int y, IReadOnlyList<int> underCursor)
         {
             GameTileManagerAPI tiles = GameTileManagerAPI.Instance;
             if (!tiles.IsTileInsideMapBounds(x, y))
@@ -227,7 +295,7 @@ namespace StrongholdEuropeDE.Runtime
             int owner = 0, unitId = 0, buildingId = 0;
             uint globalId = 0;
             // Vanilla sorted these exact IDs by cursor depth (GameMap4048..4136).
-            foreach (int candidate in frame.UnderCursor)
+            foreach (int candidate in underCursor)
             {
                 GameUnit* unit;
                 if (!units.IsValidId(candidate) || !units.TryGetUnitById(candidate, out unit) || unit == null || unit->r_AliveState != AliveState.IsAlive)

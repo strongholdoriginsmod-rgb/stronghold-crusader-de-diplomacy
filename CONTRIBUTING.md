@@ -33,9 +33,9 @@ py -3 -B tools/local_game.py prepare --help
 py -3 -B build.py --help
 ```
 
-`prepare` verlangt ausdrücklich die Vorlage der Spielkopie, die Entwicklungs-
-und öffentliche APIShared-Fassung, das SDK und die Framework-Referenzen. Die
-vorhandene Spielinstallation wird dabei nur gelesen. Nach Einrichtung der
+`prepare` verlangt ausdrücklich die Vorlage der Spielkopie, die gepinnte
+APIShared-Entwicklungsfassung, das SDK und die Framework-Referenzen. Die
+vorhandene Spielinstallation wird dabei nur gelesen. Der frühere Parameter --public-api entfällt beim QA-Treiber. Das öffentliche SDK wird direkt an build.py übergeben. Nach Einrichtung der
 getrennten Kopie erfolgt der Build mit:
 
 ```powershell
@@ -48,6 +48,39 @@ py -3 -B tools/local_game.py check
 `source-index.json` legt die ausgewählten C#-Dateien und deren Prüfsummen fest.
 Nach Änderungen wird der Index vor dem Build erneuert. `build.py` baut mit
 expliziten Abhängigkeiten und installiert oder startet selbst kein Spiel.
+
+Der lokale Spieltreiber baut und installiert die gepinnte QA-Variante. Für den
+regulären Build `build.py --profile release --build` mit dem öffentlichen
+APIShared-SDK und einer expliziten Abhängigkeitssperre ausführen. Die Sperre
+enthält die verifizierten Prüfsummen aller Referenzen einschließlich der
+ausgewählten APIShared-DLL. `references/release.json` dokumentiert den
+ursprünglichen Stand und enthält den Hash des früheren APIShared-SDKs.
+Für eine isolierte Prüfung die reguläre DLL mit dem erzeugten `info.json`
+und den bestehenden `assets/Patches` separat installieren.
+Die APIShared-Abhängigkeit wird über das eigene Paket bereitgestellt.
+
+Der reguläre Build benötigt APIShared 0.44.0 und nutzt dessen öffentliche
+Broker für HUD, Spielende, Missionswechsel und Eingaben für Truppenbefehle.
+Diplomatie veröffentlicht geschützte Spielerpaare als Regeln für die gemeinsame
+native Zielwahl.
+Die Rückmeldefrist für Verbündetenbefehle folgt der Simulationsuhr der
+aktuellen Mission. Im lokalen Gefecht bindet Diplomatie „Verteidigen“ an den
+aktuellen Verbündeten-HUD-Klick. Der originale HUD-Pfad bleibt erhalten;
+seinen Auftrag sendet Diplomatie nach den Prüfungen genau einmal über den
+gemeinsamen GameAction-Validator. Die Weiterleitung setzt das geprüfte Spiel-
+und Extender-Paar voraus. Andere Befehle behalten ihren bisherigen Pfad.
+GameAction-Regeln, die erst nach der Zurückstellung an die Reihe kämen,
+sehen die Wiederholung auf dem Simulationspfad. Ein Veto dort verhindert
+den Originalaufruf.
+
+Der passive Nachweis eines lokalen Spielstands verwendet `ManagedSaveEvents`.
+Er ordnet den unveränderten SaveData-Callback dem ursprünglichen Aufruf,
+Zielpfad und der aktuellen Mission zu. Die getrennte Save-Schutzbrücke
+bleibt für aktive Schutzpfade bestehen.
+
+Der reguläre Build erzeugt das Paketmanifest im Ausgabeordner aus
+`assets/release/info.json`. Verwende beim Paketieren das erzeugte Manifest,
+damit Plugin und Paket dieselbe APIShared-Anforderung angeben.
 
 ## Änderungen prüfen
 

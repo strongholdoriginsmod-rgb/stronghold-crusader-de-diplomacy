@@ -3084,6 +3084,10 @@ namespace StrongholdEuropeDE.Runtime
                     return;
                 }
 
+#if !DIPLOMACY_PRIVATE_TESTS
+                if (_missionSaveAttempt.Pending == 0 || _originalSavedWorld.StagingSerial() == 0)
+                    return;
+#endif
                 _pendingLegacySavePayload = payload == null ? null : (byte[])payload.Clone();
                 _pendingLegacySaveEpoch = payload == null ? -1 : _mapEpoch;
                 _pendingLegacySaveTick = payload == null ? -1 : _featureTicks;

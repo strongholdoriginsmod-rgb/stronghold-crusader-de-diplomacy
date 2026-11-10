@@ -1,3 +1,7 @@
+#if !DIPLOMACY_PRIVATE_TESTS
+using APIShared;
+using APIShared.Presentation;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -602,10 +606,17 @@ namespace StrongholdEuropeDE.Runtime
         private readonly List<int> _visiblePlayers = new List<int>();
         private readonly Dictionary<string, string> _coalitionValueLogSignatures = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly HashSet<string> _inactiveCoalitionsLogged = new HashSet<string>(StringComparer.Ordinal);
+#if DIPLOMACY_PRIVATE_TESTS
         private IDisposable _mapStartSubscription;
         private IDisposable _mapLoadSubscription;
-        private IDisposable _saveLoadSubscription;
         private IDisposable _mapUnloadSubscription;
+#else
+        private IMissionLifecycleCapability _missionLifecycle;
+        private IMissionPlayStateReadinessCapability _missionPlayState;
+        private long _missionSessionId;
+        private readonly PublicMissionSaveAttempt _missionSaveAttempt = new PublicMissionSaveAttempt();
+#endif
+        private IDisposable _saveLoadSubscription;
         private MethodInfo _buttonTarget;
         private MethodInfo _getAllyListTarget;
         private MethodInfo _updateAlliesTarget;
@@ -617,7 +628,11 @@ namespace StrongholdEuropeDE.Runtime
         private FieldInfo _currentAllyField;
         private bool _prepared;
         private bool _applied;
+#if DIPLOMACY_PRIVATE_TESTS
         private bool _buttonPatchApplied;
+#else
+        private static bool _sharedAllyPanelRegistered;
+#endif
         private bool _rosterPatchApplied;
         private bool _updatePatchApplied;
         private bool _rolloverPatchApplied;
@@ -648,7 +663,9 @@ namespace StrongholdEuropeDE.Runtime
         private long _mapEpoch;
         private long _mapBootstrapEpoch;
         private bool _epochOpenedByMapLoad;
+#if DIPLOMACY_PRIVATE_TESTS
         private long _lastMapStartFeatureTick = long.MinValue;
+#endif
         private int _selectedVisibleIndex;
         private int _pendingGoodsTarget;
         private NativeTransferProbe _nativeTransferProbe;
@@ -769,22 +786,35 @@ namespace StrongholdEuropeDE.Runtime
             Type popup = typeof(MainViewModel).Assembly.GetType("CrusaderDE.HUD_ConfirmationPopup", false);
             MethodInfo confirmation = popup == null ? null : popup.GetMethod("ShowConfirmationMessage", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(Action), typeof(Action), typeof(string), typeof(bool), typeof(bool), }, null);
             MethodInfo okMessage = popup == null ? null : popup.GetMethod("ShowConfirmationOKMessage", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(Action), typeof(string), typeof(bool), }, null);
-            MethodInfo prefix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPrefix", BindingFlags.NonPublic | BindingFlags.Static);
-            MethodInfo buttonPostfix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPostfix", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo rosterPrefix = typeof(DiplomacyFeature).GetMethod("AlliesGetAllyListPrefix", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo updatePostfix = typeof(DiplomacyFeature).GetMethod("AlliesUpdatePostfix", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo rolloverPrefix = typeof(DiplomacyFeature).GetMethod("AlliesRolloverPrefix", BindingFlags.NonPublic | BindingFlags.Static);
-            if (_buttonTarget == null || _buttonTarget.ReturnType != typeof(void) || _getAllyListTarget == null || _getAllyListTarget.ReturnType != typeof(void) || _updateAlliesTarget == null || _updateAlliesTarget.ReturnType != typeof(void) || _rolloverTarget == null || _rolloverTarget.ReturnType != typeof(void) || _selectedGoodsField == null || _selectedGoodsField.FieldType != typeof(int) || _selectedGoodsAmountField == null || _selectedGoodsAmountField.FieldType != typeof(int) || _allyField == null || _allyField.FieldType != typeof(int[]) || _numAlliesField == null || _numAlliesField.FieldType != typeof(int) || _currentAllyField == null || _currentAllyField.FieldType != typeof(int) || findName == null || updateGoods == null || alliesPanelField == null || goodsIcon == null || setFace == null || confirmation == null || okMessage == null || prefix == null || buttonPostfix == null || rosterPrefix == null || updatePostfix == null || rolloverPrefix == null)
+            if (_buttonTarget == null || _buttonTarget.ReturnType != typeof(void) || _getAllyListTarget == null || _getAllyListTarget.ReturnType != typeof(void) || _updateAlliesTarget == null || _updateAlliesTarget.ReturnType != typeof(void) || _rolloverTarget == null || _rolloverTarget.ReturnType != typeof(void) || _selectedGoodsField == null || _selectedGoodsField.FieldType != typeof(int) || _selectedGoodsAmountField == null || _selectedGoodsAmountField.FieldType != typeof(int) || _allyField == null || _allyField.FieldType != typeof(int[]) || _numAlliesField == null || _numAlliesField.FieldType != typeof(int) || _currentAllyField == null || _currentAllyField.FieldType != typeof(int) || findName == null || updateGoods == null || alliesPanelField == null || goodsIcon == null || setFace == null || confirmation == null || okMessage == null || rosterPrefix == null || updatePostfix == null || rolloverPrefix == null)
             {
                 failure = "pinned HUD_AlliesPanel diplomacy surface is unavailable";
                 return false;
             }
 
+#if DIPLOMACY_PRIVATE_TESTS
             if (MapLoaderR3EventHooks.OnStartMap.Observable == null || MapLoaderR3EventHooks.OnLoadMap.Observable == null || MapLoaderR3EventHooks.OnLoadSave.Observable == null || MapLoaderR3EventHooks.OnUnloadMap.Observable == null)
             {
                 failure = "diplomacy map/day event streams are unavailable";
                 return false;
             }
+#else
+            var client = APIShared.ApiShared.ForMod(CompatibilityContracts.PluginId);
+            if (!client.TryGetMissionLifecycle(out _missionLifecycle, out var diagnostic) ||
+                !client.TryGetMissionPlayStateReadiness(out _missionPlayState, out diagnostic))
+            {
+                failure = "diplomacy mission lifecycle unavailable: " + diagnostic;
+                return false;
+            }
+            if (MapLoaderR3EventHooks.OnLoadSave.Observable == null)
+            {
+                failure = "original save verification event stream unavailable";
+                return false;
+            }
+#endif
 
             string bridgeFailure;
             if (!ScriptExtenderNativeBridge.TryResolve(out bridgeFailure))
@@ -823,8 +853,6 @@ namespace StrongholdEuropeDE.Runtime
 
             try
             {
-                MethodInfo prefix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPrefix", BindingFlags.NonPublic | BindingFlags.Static);
-                MethodInfo buttonPostfix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPostfix", BindingFlags.NonPublic | BindingFlags.Static);
                 MethodInfo rosterPrefix = typeof(DiplomacyFeature).GetMethod("AlliesGetAllyListPrefix", BindingFlags.NonPublic | BindingFlags.Static);
                 MethodInfo updatePostfix = typeof(DiplomacyFeature).GetMethod("AlliesUpdatePostfix", BindingFlags.NonPublic | BindingFlags.Static);
                 MethodInfo rolloverPrefix = typeof(DiplomacyFeature).GetMethod("AlliesRolloverPrefix", BindingFlags.NonPublic | BindingFlags.Static);
@@ -832,8 +860,20 @@ namespace StrongholdEuropeDE.Runtime
                 _rosterPatchApplied = true;
                 _harmony.Patch(_updateAlliesTarget, postfix: new HarmonyMethod(updatePostfix));
                 _updatePatchApplied = true;
+#if DIPLOMACY_PRIVATE_TESTS
+                MethodInfo prefix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPrefix", BindingFlags.NonPublic | BindingFlags.Static);
+                MethodInfo buttonPostfix = typeof(DiplomacyFeature).GetMethod("AlliesButtonPostfix", BindingFlags.NonPublic | BindingFlags.Static);
                 _harmony.Patch(_buttonTarget, prefix: new HarmonyMethod(prefix), postfix: new HarmonyMethod(buttonPostfix));
                 _buttonPatchApplied = true;
+#else
+                if (!_sharedAllyPanelRegistered)
+                {
+                    if (!AllyPanelButtonEvents.TryRegister(CompatibilityContracts.PluginId,
+                            "diplomacy-allies-panel", OnSharedAlliesButtonPre, OnSharedAlliesButtonPost, out string buttonFailure))
+                        throw new InvalidOperationException("Diplomacy ally panel unavailable: " + buttonFailure);
+                    _sharedAllyPanelRegistered = true;
+                }
+#endif
                 _harmony.Patch(_rolloverTarget, prefix: new HarmonyMethod(rolloverPrefix));
                 _rolloverPatchApplied = true;
                 if (!ModSaveDataAPI.Instance.RegisterModDataHandler(GeneratedDiplomacyContract.SaveDataIdentifier, SaveData, LoadData))
@@ -846,10 +886,14 @@ namespace StrongholdEuropeDE.Runtime
                 // Map identity is owned by the primary ExtendedState save envelope.
 #endif
                 RegisterLegacySaveImport();
+#if DIPLOMACY_PRIVATE_TESTS
                 _mapStartSubscription = ObservableSubscribeExtensions.Subscribe(MapLoaderR3EventHooks.OnStartMap.Observable, OnStartMap);
                 _mapLoadSubscription = ObservableSubscribeExtensions.Subscribe(MapLoaderR3EventHooks.OnLoadMap.Observable, OnLoadMap);
-                _saveLoadSubscription = ObservableSubscribeExtensions.Subscribe(MapLoaderR3EventHooks.OnLoadSave.Observable, OnLoadSave);
                 _mapUnloadSubscription = ObservableSubscribeExtensions.Subscribe(MapLoaderR3EventHooks.OnUnloadMap.Observable, OnUnloadMap);
+#endif
+                // This event supplies the native stage of the original-save proof.
+                // In the public build, it never starts or ends a session.
+                _saveLoadSubscription = ObservableSubscribeExtensions.Subscribe(MapLoaderR3EventHooks.OnLoadSave.Observable, OnLoadSave);
                 // Observes the original managed producer/application only.
                 // Unbound original saves remain pending, never early-restored.
                 InstallOriginalSavedWorldObserver();
@@ -864,6 +908,10 @@ namespace StrongholdEuropeDE.Runtime
                 // Strict startup admission and original monitor binding have
                 // already succeeded. Optional isolated QA observation only.
                 InstallPrivateOriginalMapPhaseObserver();
+#else
+                if (!_missionLifecycle.TryRegisterObserver("diplomacy-mission", OnSharedMissionStart,
+                        OnSharedMissionEnd, OnSharedMissionInitialization, out var diagnostic))
+                    throw new InvalidOperationException("Diplomacy mission registration failed: " + diagnostic);
 #endif
                 Log("activation", "status=active|canary=" + BoolText(GeneratedDiplomacyContract.IsolatedCanary));
             }
@@ -874,6 +922,8 @@ namespace StrongholdEuropeDE.Runtime
             }
         }
 
+        internal bool HasActiveMissionTick => _mapActive && !_mapDisabled && !_mapBootstrapPending;
+
         public void Tick()
         {
             lock (_gate)
@@ -881,6 +931,10 @@ namespace StrongholdEuropeDE.Runtime
                 _featureTicks++;
                 // Reconcile optional chat even if this frame exits early.
                 MaintainLordChatPresentation();
+#if !DIPLOMACY_PRIVATE_TESTS
+                if (_missionSessionId == 0 || _missionLifecycle.Current?.SessionId != _missionSessionId)
+                    return;
+#endif
                 // A late foreign broker veto may need one later metadata-only
                 // RequestHistory cancellation under this already-owned gate.
                 // This never retries or alters the original/native action.
@@ -893,7 +947,9 @@ namespace StrongholdEuropeDE.Runtime
                     Log("gameaction", "status=shared_callback_fail_closed_or_late_mutation" +
                         "|count=" + brokerFaults.ToString(CultureInfo.InvariantCulture) +
                         "|native_ack=false");
+#if DIPLOMACY_PRIVATE_TESTS
                 ReportNativeTruceAdmission();
+#endif
                 if (_deferredPortraitRestore && CanPresentDiplomacyUi)
                 {
                     _deferredPortraitRestore = false;
@@ -946,6 +1002,10 @@ namespace StrongholdEuropeDE.Runtime
                          _pendingSavePayload != null || _pendingLegacySavePayload != null) &&
                         !_originalSavedWorld.IsApplied(_mapEpoch))
                         return;
+#if !DIPLOMACY_PRIVATE_TESTS
+                    if (_missionPlayState.Current?.SessionId != _missionSessionId)
+                        return;
+#endif
                     if (_featureTicks < _mapBootstrapNotBeforeTick || !IsPlayableMapRuntimeReady())
                     {
                         return;
@@ -1287,10 +1347,12 @@ namespace StrongholdEuropeDE.Runtime
             GameTimeManagerAPI.Instance.OnTick -= OnSimulationTick;
             RemoveOriginalSavedWorldObserver();
             RollbackCombatSafety();
+#if DIPLOMACY_PRIVATE_TESTS
             Dispose(ref _mapUnloadSubscription);
-            Dispose(ref _saveLoadSubscription);
             Dispose(ref _mapLoadSubscription);
             Dispose(ref _mapStartSubscription);
+#endif
+            Dispose(ref _saveLoadSubscription);
             UnregisterLegacySaveImport();
             if (_saveHandlerRegistered)
             {
@@ -1301,12 +1363,14 @@ namespace StrongholdEuropeDE.Runtime
                 ModSaveDataAPI.Instance.UnregisterModDataHandler(GeneratedDiplomacyContract.SaveDataIdentifier);
             }
 
+#if DIPLOMACY_PRIVATE_TESTS
             if (_buttonPatchApplied && _buttonTarget != null)
             {
                 _buttonPatchApplied = false;
                 _harmony.Unpatch(_buttonTarget, HarmonyPatchType.Prefix, _harmony.Id);
                 _harmony.Unpatch(_buttonTarget, HarmonyPatchType.Postfix, _harmony.Id);
             }
+#endif
 
             if (_rolloverPatchApplied && _rolloverTarget != null)
             {
@@ -1474,6 +1538,93 @@ namespace StrongholdEuropeDE.Runtime
                 return true;
             }
         }
+
+#if !DIPLOMACY_PRIVATE_TESTS
+        private static void OnSharedAlliesButtonPre(AllyPanelButtonPreEventArgs args)
+        {
+            var owner = Volatile.Read(ref _activeOwner);
+            if (owner == null || args.SkipOriginalFunction)
+                return;
+            lock (owner._gate)
+            {
+                if (args.Button == "Defend")
+                {
+                    owner.TryClaimHudDefend(args);
+                    return;
+                }
+                if (!owner.ClaimsAllyPanelButton(args.Panel, args.Button))
+                    return;
+
+                long generation = owner._sessionGeneration;
+                args.TryClaim(invocation =>
+                {
+                    bool forward;
+                    lock (owner._gate)
+                    {
+                        if (!ReferenceEquals(Volatile.Read(ref _activeOwner), owner) ||
+                            owner._sessionGeneration != generation ||
+                            !owner.ClaimsAllyPanelButton(invocation.Panel, invocation.Button))
+                            return;
+                        forward = AlliesButtonPrefix(invocation.Panel, invocation.Button);
+                    }
+                    if (forward)
+                        invocation.InvokeOriginal(invocation.Button);
+                });
+            }
+        }
+
+        private bool ClaimsAllyPanelButton(HUD_AlliesPanel panel, string button)
+        {
+            if (string.IsNullOrEmpty(button))
+                return false;
+            if (button == "Diplomacy:Trade:Close")
+                return true;
+            if (!_mapActive || _mapDisabled || _mapBootstrapPending || !MainViewModel.viewModelLoaded)
+                return false;
+            var view = MainViewModel.Instance;
+            if (view == null || !ReferenceEquals(panel, view.HUDAlliesPanel))
+                return false;
+            if (button.StartsWith("Diplomacy:", StringComparison.Ordinal))
+                return true;
+
+            var replay = _goodsRequestInvocation;
+            if (replay != null && ReferenceEquals(replay.Owner, this) && ReferenceEquals(replay.Panel, panel) &&
+                (replay.Command == button || (replay.DeferExit && button == "Exit")))
+                return true;
+
+            switch (button)
+            {
+                case "ConfirmGoods":
+                    return _pendingGoodsTarget > 0 || _goodsRequest != null || HasPendingGoodsCommand ||
+                        (_sharedGoodsRequestActive && view.Allies_RequestGoodsViewVis);
+                case "CancelGoods":
+                    return _goodsRequest != null;
+                case "Back":
+                case "Exit":
+                case "Send":
+                case "Orders":
+                case "CancelOrders":
+                case "Request":
+                case "0":
+                case "1":
+                case "2":
+                case "3":
+                case "4":
+                case "5":
+                    return true;
+                default:
+                    // Ordinary quantity/ware clicks belong to Vanilla or QoL.
+                    return _goodsRequest != null && _goodsRequest.Confirmed &&
+                        (button[0] == 'G' || button[0] == 'X');
+            }
+        }
+
+        private static void OnSharedAlliesButtonPost(AllyPanelButtonPostEventArgs args)
+        {
+            if (args.OriginalCompleted)
+                AlliesButtonPostfix(args.Button);
+        }
+#endif
 
         private static bool AlliesButtonPrefix(object __instance, string param)
         {
@@ -1684,6 +1835,10 @@ namespace StrongholdEuropeDE.Runtime
 
                     if (IsCoalitionAllied(selectedPlayer))
                     {
+#if !DIPLOMACY_PRIVATE_TESTS
+                        if (!_sharedGoodsRequestActive)
+                            return false;
+#endif
                         BeginGoodsRequest(panel, selectedPlayer, false);
                         return true;
                     }
@@ -1693,7 +1848,9 @@ namespace StrongholdEuropeDE.Runtime
                 {
                     if (IsCoalitionAllied(selectedPlayer))
                     {
+#if DIPLOMACY_PRIVATE_TESTS
                         _pendingGoodsTarget = selectedPlayer;
+#endif
                         return false;
                     }
 
@@ -1744,6 +1901,7 @@ namespace StrongholdEuropeDE.Runtime
             }
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         private void OnLoadMap(MapLoadEventArgs e)
         {
             NoteLane(LaneMapLoader);
@@ -1759,8 +1917,14 @@ namespace StrongholdEuropeDE.Runtime
             }
         }
 
+#endif
+
         private void OnLoadSave(LoadSaveGameEventArgs e)
         {
+#if !DIPLOMACY_PRIVATE_TESTS
+            if (_originalLoadInvocation == null || _missionSaveAttempt.Pending == 0)
+                return;
+#endif
             NoteLane(LaneMapLoader);
             if (e != null && e.Phase == EventHookPhase.Pre)
             {
@@ -1797,6 +1961,7 @@ namespace StrongholdEuropeDE.Runtime
                     ReconcileLegacySaveEpoch();
                 }
 
+#if DIPLOMACY_PRIVATE_TESTS
                 try
                 {
                     if (IsPlayableMapRuntimeReady())
@@ -1811,6 +1976,7 @@ namespace StrongholdEuropeDE.Runtime
                 }
 
                 ScheduleMapBootstrap("save_load");
+#endif
             }
         }
 
@@ -1895,6 +2061,7 @@ namespace StrongholdEuropeDE.Runtime
             Log("activation", "status=native_epoch_started|epoch=" + _mapEpoch.ToString(CultureInfo.InvariantCulture) + "|trigger=" + Safe(trigger));
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         private void OnStartMap(MapStartEventArgs e)
         {
             NoteLane(LaneMapLoader);
@@ -1928,6 +2095,109 @@ namespace StrongholdEuropeDE.Runtime
 
             ScheduleMapBootstrap("map_start");
         }
+
+#else
+        private void OnSharedMissionInitialization(MissionLifecycleNotification notification)
+        {
+            if (!ReferenceEquals(Volatile.Read(ref _activeOwner), this) ||
+                notification.Phase != MissionInitializationPhase.BeforeLoad ||
+                !notification.Context.IsSave)
+                return;
+            lock (_gate)
+            {
+                if (_missionLifecycle.Current == null && _missionSaveAttempt.TryBegin(notification.Context.SessionId))
+                    DiscardStagedPublicSave();
+            }
+        }
+
+        private void DiscardStagedPublicSave()
+        {
+            _epochOpenedByMapLoad = false;
+            _pendingSavePayload = null;
+            _pendingSaveEpoch = -1;
+            _pendingSaveStagedFeatureTick = -1;
+            _pendingSaveApplySerial = 0;
+            ConsumePendingLegacySave();
+        }
+
+        private static bool IsSupportedPublicSoloMission(MissionContext mission) =>
+            mission != null && !mission.IsEditor &&
+            mission.Mode.IsSingleplayerSkirmish && !mission.Mode.IsRealMultiplayer &&
+            RuntimeSessionScopeDecision.IsOrdinarySkirmishPath(mission.Mode.SkirmishGameType, mission.Mode.CoopTrailId);
+
+        private bool IsCurrentPublicSoloMission(MissionContext mission) =>
+            IsSupportedPublicSoloMission(mission) && mission.SessionId == _missionSessionId;
+
+        private void OnSharedMissionStart(MissionLifecycleNotification notification)
+        {
+            if (!ReferenceEquals(Volatile.Read(ref _activeOwner), this))
+                return;
+
+            NoteLane(LaneMapLoader);
+            var context = notification.Context;
+            lock (_gate)
+            {
+                if (!IsSupportedPublicSoloMission(context) ||
+                    !_missionSaveAttempt.TryAcceptStart(context.SessionId, _missionLifecycle.Current?.SessionId ?? 0,
+                        context.IsSave, _epochOpenedByMapLoad))
+                    return;
+
+                if (!context.IsSave)
+                {
+                    DiscardStagedPublicSave();
+                    BeginNativeMapEpoch("map_start");
+                }
+                _epochOpenedByMapLoad = false;
+                _missionSessionId = context.SessionId;
+                // The original producer finalizer may still be on the stack.
+                // Tick waits for both a fresh PlayState and the saved-world proof.
+                ScheduleMapBootstrap(context.IsSave ? "save_load" : "map_start");
+            }
+        }
+
+        private void OnSharedMissionEnd(MissionLifecycleNotification notification)
+        {
+            if (!ReferenceEquals(Volatile.Read(ref _activeOwner), this))
+                return;
+
+            NoteLane(LaneMapLoader);
+            lock (_gate)
+            {
+                long ending = notification.Context.SessionId;
+                if (_missionSaveAttempt.Retire(ending))
+                {
+                    DiscardStagedPublicSave();
+                    _originalSavedWorld.Retire();
+                }
+                if (ending != _missionSessionId)
+                    return;
+
+                // Nested lifecycle notifications can be delivered after the
+                // native loader returns. End retires ownership but does not
+                // authorize writes to the previous world's player slots.
+                _missionSessionId = 0;
+                // The image attestation lasts for this process. Mission state and
+                // queued/replaying tickets are retired here, not the shared capability.
+                Volatile.Write(ref _sharedGoodsRequestActive, false);
+                ClearAllyOrders();
+                ResetGoodsRequests();
+                CancelPendingGoodsCommand("mission_end");
+                _pendingGoodsTarget = 0;
+                _dialogQueue.Clear();
+                ClearDeferredDiplomacyUi();
+                _mapBootstrapPending = false;
+                _mapBootstrapTrigger = null;
+                _mapActive = false;
+                _mapDisabled = false;
+                _sessionGeneration++;
+                _deferredDisableStage = null;
+                _deferredDisableException = null;
+                _saveFailurePending = null;
+                SetCombatProtectionSnapshot(CombatProtectionSnapshot.Empty);
+                Log("activation", "status=mission_retired|reason=" + notification.EndReason);
+            }
+        }
+#endif
 
         private void BeginMapSession(string trigger)
         {
@@ -2048,6 +2318,13 @@ namespace StrongholdEuropeDE.Runtime
                     int activePlayers = -1;
                     int otherHumanPlayers = -1;
                     string sessionRosterReason = "offline_no_network_roster";
+#if DIPLOMACY_PRIVATE_TESTS
+                    bool lobbyBlocksSolo = GameNetworkAPI.IsLobbyEnvironment();
+#else
+                    var mission = _missionLifecycle.Current;
+                    // A local skirmish can retain its lobby. Only the current APIShared mission classifies it.
+                    bool lobbyBlocksSolo = !IsCurrentPublicSoloMission(mission);
+#endif
                     if (networked)
                     {
                         localHost = GameNetworkAPI.IsLocalHost();
@@ -2085,21 +2362,26 @@ namespace StrongholdEuropeDE.Runtime
                             otherHumanPlayers =
                                 RuntimeSessionScopeDecision.CountOtherOriginalHumanPlayers(
                                     GameData.Instance.playerID, human, ai,
-                                    members, GameNetworkAPI.IsLobbyEnvironment(),
+                                    members, lobbyBlocksSolo,
                                     out sessionRosterReason);
                         }
                     }
 
+#if DIPLOMACY_PRIVATE_TESTS
                     int skirmishPath = GameData.Instance == null ? -1 : GameData.Instance.SkirmishGameType;
                     int coopTrail = GameData.Instance == null ? -1 : GameData.Instance.coopTrailID;
+#else
+                    int skirmishPath = mission?.Mode.SkirmishGameType ?? -1;
+                    int coopTrail = mission?.Mode.CoopTrailId ?? -1;
+#endif
                     bool supportedSkirmishPath =
                         RuntimeSessionScopeDecision.IsOrdinarySkirmishPath(skirmishPath, coopTrail);
                     if (networked && otherHumanPlayers < 0)
                         Log("session_scope", "status=roster_unproven|reason=" +
                             Safe(sessionRosterReason));
                     Log("session_scope", "status=" + RuntimeSessionScopeDecision.Status(networked, localHost, otherHumanPlayers) + "|networked=" + (networked ? "true" : "false") + "|local_host=" + (localHost ? "true" : "false") + "|active_players=" + activePlayers.ToString(CultureInfo.InvariantCulture) + "|other_humans=" + otherHumanPlayers.ToString(CultureInfo.InvariantCulture) + "|skirmish_path=" + skirmishPath.ToString(CultureInfo.InvariantCulture) + "|coop_trail=" + coopTrail.ToString(CultureInfo.InvariantCulture) + "|trigger=" + Safe(trigger));
-                    bool supportedByOriginalSession = RuntimeSessionScopeDecision.AllowsDiplomacyMap(networked, localHost, otherHumanPlayers, GameData.Instance != null, GameData.Instance != null && GameData.Instance.lastGameState != null, GameData.Instance != null && GameData.Instance.multiplayerMap, Director.instance != null, Director.instance != null && Director.instance.MultiplayerGame, MainViewModel.Instance != null, MainViewModel.Instance != null && MainViewModel.Instance.SkirmishModeVisAlly);
 #if DIPLOMACY_PRIVATE_TESTS
+                    bool supportedByOriginalSession = RuntimeSessionScopeDecision.AllowsDiplomacyMap(networked, localHost, otherHumanPlayers, GameData.Instance != null, GameData.Instance != null && GameData.Instance.lastGameState != null, GameData.Instance != null && GameData.Instance.multiplayerMap, Director.instance != null, Director.instance != null && Director.instance.MultiplayerGame, MainViewModel.Instance != null, MainViewModel.Instance != null && MainViewModel.Instance.SkirmishModeVisAlly);
                     if (!supportedByOriginalSession && supportedSkirmishPath)
                     {
                         string scopeReason;
@@ -2119,6 +2401,9 @@ namespace StrongholdEuropeDE.Runtime
                         Log("trade_session", "status=private_bootstrap_native_session_proof|verified=" + verifiedSolo + "|reason=" + Safe(scopeReason));
                     }
 
+#else
+                    bool supportedByOriginalSession = !lobbyBlocksSolo &&
+                        RuntimeSessionScopeDecision.AllowsLocalMutation(networked, localHost, otherHumanPlayers);
 #endif
                     if (supportedSkirmishPath && !supportedByOriginalSession && BootstrapOriginalMpTradeOnly(stagedSavePayload, stagedLegacySavePayload))
                         return;
@@ -2245,6 +2530,7 @@ namespace StrongholdEuropeDE.Runtime
             return localPlayer >= 1 && localPlayer <= 8 && alive != null && alive.Contains(localPlayer);
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         private void OnUnloadMap(MapUnloadEventArgs e)
         {
             NoteLane(LaneMapLoader);
@@ -2279,6 +2565,8 @@ namespace StrongholdEuropeDE.Runtime
                 }
             }
         }
+
+#endif
 
         // Der Tageszaehler des Extenders ist seit SE 2.0 ein uint; bis 1.45
         // war er short. Gemessen am im Spiel: gleicher Feldname,
@@ -2732,6 +3020,10 @@ namespace StrongholdEuropeDE.Runtime
                     return;
                 }
 
+#if !DIPLOMACY_PRIVATE_TESTS
+                if (_missionSaveAttempt.Pending == 0 || _originalSavedWorld.StagingSerial() == 0)
+                    return;
+#endif
                 _loadedSavePath = context.FilePath;
 #if DIPLOMACY_PRIVATE_TESTS
                 NoteOriginalAidLoad(context.FilePath, payload);

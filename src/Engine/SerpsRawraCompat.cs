@@ -35,12 +35,25 @@ namespace StrongholdEuropeDE.TradeNegotiation
         internal static readonly Version MinSerps = new Version(1, 0, 192);
         internal static bool ManagedApiVersionsCompatible(IDictionary<string, Version> discovered, out string diagnostic)
         {
-            diagnostic = "missing dependency";
+            diagnostic = "loaded plugin metadata unavailable";
             if (discovered == null)
                 return false;
             Version rawra, shared, serps;
-            if (!discovered.TryGetValue(RawraGuid, out rawra) || !discovered.TryGetValue(ApiSharedGuid, out shared) || !discovered.TryGetValue(SerpsGuid, out serps) || rawra == null || shared == null || serps == null)
+            if (!discovered.TryGetValue(RawraGuid, out rawra) || rawra == null)
+            {
+                diagnostic = "missing loaded Script Extender (" + RawraGuid + ")";
                 return false;
+            }
+            if (!discovered.TryGetValue(ApiSharedGuid, out shared) || shared == null)
+            {
+                diagnostic = "missing loaded APIShared (" + ApiSharedGuid + ")";
+                return false;
+            }
+            if (!discovered.TryGetValue(SerpsGuid, out serps) || serps == null)
+            {
+                diagnostic = "missing loaded BugfixesAndQoL (" + SerpsGuid + ")";
+                return false;
+            }
             if (rawra < MinRawra)
             {
                 diagnostic = "rawra ScriptExtender <2.14.0";

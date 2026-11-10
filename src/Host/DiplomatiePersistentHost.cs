@@ -1,3 +1,4 @@
+#if DIPLOMACY_PRIVATE_TESTS
 using System;
 using UnityEngine;
 
@@ -67,3 +68,4 @@ namespace StrongholdEuropeDE.Diplomatie
         }
     }
 }
+#endif

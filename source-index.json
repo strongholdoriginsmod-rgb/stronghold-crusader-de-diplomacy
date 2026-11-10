@@ -73,7 +73,7 @@
     {
       "path": "Diplomacy/CombatSafety.cs",
       "stage_path": "src/Diplomacy/CombatSafety.cs",
-      "sha256": "1b07216cb1aeb4c1969033e38237ed2a542838bd11dc874b0c25ffc83da37932"
+      "sha256": "041711f923ee7e89ed439987608f01fdf25336753feb747ecef31db5277243b5"
     },
     {
       "path": "Diplomacy/DiplomacyBreachNotices.cs",
@@ -93,7 +93,7 @@
     {
       "path": "Diplomacy/DiplomacyFeature.cs",
       "stage_path": "src/Diplomacy/DiplomacyFeature.cs",
-      "sha256": "6b1e3a6db055d2cfddbfaea9a7849b5be9eae03fb2497767cf28a4e8e15db5db"
+      "sha256": "08d6d5a440f759a6999f915503558fb131fecedccbd92f2b689c022ccac0972c"
     },
     {
       "path": "Diplomacy/DiplomacyGoodsCommands.cs",
@@ -103,12 +103,12 @@
     {
       "path": "Diplomacy/DiplomacyGoodsRequests.cs",
       "stage_path": "src/Diplomacy/DiplomacyGoodsRequests.cs",
-      "sha256": "9692fc709cde8670344ba84a3774b85145230c7a943e282d7a9a3e1cddb24289"
+      "sha256": "9746ced122e5b864f02d3cf6808f6660cb95d033302b61a537122d0358b16fba"
     },
     {
       "path": "Diplomacy/DiplomacyHumanOrders.cs",
       "stage_path": "src/Diplomacy/DiplomacyHumanOrders.cs",
-      "sha256": "7d373e635bfefa6dc35881715af379b58d4d9361f0e59868c733aef538f8b0a2"
+      "sha256": "7979ef238c3755211db05a3ce5b4c4d91c12d5f644b6b08d321bcc52e5cccab9"
     },
     {
       "path": "Diplomacy/DiplomacyPresentationEvents.cs",
@@ -123,7 +123,7 @@
     {
       "path": "Diplomacy/DiplomacyRelations.cs",
       "stage_path": "src/Diplomacy/DiplomacyRelations.cs",
-      "sha256": "ac9eb19e7b947549bd7406a22c4d76dded371fb4a355b4dae81fa27ac201b854"
+      "sha256": "2961d2185ac92d841773ca6672d02aa70fc7a338ad82ccacc483ff2df33e9a58"
     },
     {
       "path": "Diplomacy/DiplomacyRelationshipDecisions.cs",
@@ -328,7 +328,17 @@
     {
       "path": "Engine/DiplomacyNativeTruceAdmission.cs",
       "stage_path": "src/Engine/DiplomacyNativeTruceAdmission.cs",
-      "sha256": "e67f604c6e0a0a12026ca7cc69cd6e5c1467bacf5add5207e710af22cc0340af"
+      "sha256": "c5b43e526af3b0dd8beaa10b09e208e536bf02df3260a4fa1f6b72cc14651487"
+    },
+    {
+      "path": "Engine/DiplomacySharedTargetExclusions.cs",
+      "stage_path": "src/Engine/DiplomacySharedTargetExclusions.cs",
+      "sha256": "f12ca5d092783c52932306b203e482ca2bdbfe6cfd32e659dfd7915d03709285"
+    },
+    {
+      "path": "Engine/DiplomacyTargetExclusionAcceptance.DevDiag.cs",
+      "stage_path": "src/Engine/DiplomacyTargetExclusionAcceptance.DevDiag.cs",
+      "sha256": "dbe4d34acbc98da20a935a2c8ce95b2eb87c1f323d0fb131d2725b1fa52d9416"
     },
     {
       "path": "Engine/DiplomatieCompatibilityGuard.cs",
@@ -378,7 +388,7 @@
     {
       "path": "Engine/OriginalSoloReleaseAdmission.cs",
       "stage_path": "src/Engine/OriginalSoloReleaseAdmission.cs",
-      "sha256": "1b9a2fc6967be16240ae2838e8c0754978ea373061128faaeb0f12c877f947e4"
+      "sha256": "46d029a88558de3aef5d2ed49be1c30c70f813db39b8ed56917865b4223916f9"
     },
     {
       "path": "Engine/OriginalSoloSaveEvidence.cs",
@@ -388,7 +398,7 @@
     {
       "path": "Engine/SerpsRawraCompat.cs",
       "stage_path": "src/Engine/SerpsRawraCompat.cs",
-      "sha256": "16aa66f84f3a5e4aa6e40c4a08ab29d1f163cd41dcc35f15fe564dd962e005e0"
+      "sha256": "b3fa8e33908e589547a467f39ca7877c7d8a08a4eb80147b4d52e087bf2846b2"
     },
     {
       "path": "Engine/StrictNativeTradeAuthorities.cs",
@@ -398,17 +408,22 @@
     {
       "path": "Host/DiplomatiePersistentHost.cs",
       "stage_path": "src/Host/DiplomatiePersistentHost.cs",
-      "sha256": "309141e915c7b0ce7c2740e7e8d732e057604d993080f05049cd5c39c150e616"
+      "sha256": "2c58659e40a56d630985c06ccbe1250c635ef2f68fb689415bffb19b2832b8bb"
     },
     {
       "path": "Host/DiplomatiePlugin.cs",
       "stage_path": "src/Host/DiplomatiePlugin.cs",
-      "sha256": "7e106d6b262c54209eaf5ee06828b1dcc8bf2b0df142dd30b190b9add971798d"
+      "sha256": "d91331b9815906dcd4bf8e8ad738a7b638a8b6392d49f321915827bb6bbec517"
     },
     {
       "path": "Military/AiAllianceMilitaryPlanner.cs",
       "stage_path": "src/Military/AiAllianceMilitaryPlanner.cs",
       "sha256": "d0541de23d4ee0c87662304b6fa876efbccc594f69c4ed10b93855e07f09a2c2"
+    },
+    {
+      "path": "Military/AllyOrderAcceptance.DevDiag.cs",
+      "stage_path": "src/Military/AllyOrderAcceptance.DevDiag.cs",
+      "sha256": "726ea176a437e10144ed5c13caf54f00381577d5b793041e3a78fc63c8acb008"
     },
     {
       "path": "Military/HostDirectedAiTribeBridge.cs",
@@ -423,7 +438,7 @@
     {
       "path": "Military/HumanAllyOrderPipeline.cs",
       "stage_path": "src/Military/HumanAllyOrderPipeline.cs",
-      "sha256": "eb6347177b24c36cd8051491c8dd07e4d7993a99eee1e044a744091f060ac841"
+      "sha256": "0cce304c0c73bf9c506bf8a953d5a8b0a46b9cfb35403b226215b4429e7e5136"
     },
     {
       "path": "Military/HumanAllyOrderReapplication.cs",
@@ -478,12 +493,12 @@
     {
       "path": "Military/OriginalHumanAllyOrderBridge.cs",
       "stage_path": "src/Military/OriginalHumanAllyOrderBridge.cs",
-      "sha256": "1b86e641b5ffe735e93ea1c1350bed394584377859be71ff908bf273f14f519b"
+      "sha256": "e6f50b220dc0f0e877a958a00e5969cf42413e303684cc41e38d8d5e0a15a332"
     },
     {
       "path": "Military/OriginalHumanAllyOrderRules.cs",
       "stage_path": "src/Military/OriginalHumanAllyOrderRules.cs",
-      "sha256": "b72f746701cf756746bb15b2a4b757bc6fa2880fa5b03859b488aa0b5f822e12"
+      "sha256": "908f5206e82e3bfd36d8dbdd32595a028cfbb6eda0006a5244be6be5cb0974fb"
     },
     {
       "path": "Military/OriginalPreWorkerRegistration.cs",
@@ -668,7 +683,7 @@
     {
       "path": "Persistence/OriginalGameSaveBridge.cs",
       "stage_path": "src/Persistence/OriginalGameSaveBridge.cs",
-      "sha256": "e122be4ca679a4b5f42b9ff2636f9f33924202c0db2029359f9d4ab38aaccea9"
+      "sha256": "a6db4fc2efb1dcdf0fe9bb0fd74223c53f666d8073737fa1bc6e44b5fb3de244"
     },
     {
       "path": "Persistence/OriginalMultiplayerConsentStateOwner.cs",
@@ -678,12 +693,17 @@
     {
       "path": "Persistence/OriginalSavedWorldReadiness.cs",
       "stage_path": "src/Persistence/OriginalSavedWorldReadiness.cs",
-      "sha256": "9575ab9fcac220e8cf9dbe6aaee35f237f3cd89317e3a0bef0786c73bcca8a1a"
+      "sha256": "dbeb2454430da805ea5407c5b0885095948fe798bde70ff4d9c4d93450e9a21e"
     },
     {
       "path": "Persistence/OriginalSoloSaveReadback.cs",
       "stage_path": "src/Persistence/OriginalSoloSaveReadback.cs",
-      "sha256": "99662974f07524788d0cd9a957d31087b1eb03114d61f159b068f98c7e217f6b"
+      "sha256": "2cd466eff3d61e8d62b7948d0227e5c970fa3098d19e4b51a6d6d28895f37e24"
+    },
+    {
+      "path": "Persistence/PublicMissionSaveAttempt.cs",
+      "stage_path": "src/Persistence/PublicMissionSaveAttempt.cs",
+      "sha256": "5dd8736f4c56544cafb0d5f52e082874b5844affb409b07eee6155de838f8064"
     },
     {
       "path": "Persistence/TradeSave.cs",
@@ -913,7 +933,7 @@
     {
       "path": "Ui/LordChat.cs",
       "stage_path": "src/Ui/LordChat.cs",
-      "sha256": "619f48324c7b57e81e45ac7c180a20036da9c325df424bad24a03589b410911c"
+      "sha256": "25e04a6c1f4039b729f0985419f0fe3399349d7935923c6d5144b8868fd30666"
     },
     {
       "path": "Ui/MultiplayerTradeConsentPresenter.cs",

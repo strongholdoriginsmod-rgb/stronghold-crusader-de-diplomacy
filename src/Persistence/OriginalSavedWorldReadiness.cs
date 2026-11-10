@@ -44,6 +44,12 @@ namespace StrongholdEuropeDE.Runtime
             }
         }
 
+        internal void Retire()
+        {
+            lock (_sync)
+                _current = null;
+        }
+
         internal void NativeEpochChanged(long epoch)
         {
             lock (_sync)

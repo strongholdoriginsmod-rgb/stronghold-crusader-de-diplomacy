@@ -439,6 +439,14 @@ namespace StrongholdEuropeDE.Runtime
 
             if (!request.Confirmed || !CanPresentDiplomacyUi)
                 return;
+#if !DIPLOMACY_PRIVATE_TESTS
+            // A real producer may only run while our final validator is active.
+            if (!_sharedGoodsRequestActive)
+            {
+                ResetGoodsRequests();
+                return;
+            }
+#endif
             if (_inventoryRestorePending || _nativeTransferProbe != null || _pendingPackage != null || _pendingTeamTransition != null)
             {
                 PresentGoodsRequestWaiting(request);

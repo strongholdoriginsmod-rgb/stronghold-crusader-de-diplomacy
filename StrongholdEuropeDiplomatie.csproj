@@ -58,6 +58,9 @@
   </Target>
 
   <Import Project="$(SelectedCompileItemsFile)" />
+  <ItemGroup Condition="'$(DevDiagSource)' != ''">
+    <Compile Include="$(DevDiagSource)" Link="Shared/Runtime/Diagnostics/DevDiag.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="BepInEx"><HintPath>$(BepInExReference)</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(HarmonyReference)</HintPath><Private>false</Private></Reference>

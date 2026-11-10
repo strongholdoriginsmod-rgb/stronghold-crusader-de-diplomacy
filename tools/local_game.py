@@ -70,12 +70,11 @@ def copy_tree(source: Path, target: Path) -> None:
 
 def prepare(args) -> None:
     check(not GAME.exists(), "The dedicated game is already prepared.")
-    for p in (RUNTIME, args.template, args.developer_api, args.public_api, args.sdk, args.framework_refs):
+    for p in (RUNTIME, args.template, args.developer_api, args.sdk, args.framework_refs):
         regular_path(p)
     template = args.template.resolve(strict=True)
     check(not template.is_relative_to(RUNTIME.resolve()), "Select an existing game copy as input.")
     expected = read_json(ROOT / "references/qa.json")["sha256"]
-    expected_release = read_json(ROOT / "references/release.json")["sha256"]
     checks = {
         f"{GAME_DATA}/Managed/Assembly-CSharp.dll": expected["AssemblyCSharpReference"],
         "BepInEx/core/BepInEx.dll": expected["BepInExReference"],
@@ -87,7 +86,6 @@ def prepare(args) -> None:
         check(sha(template / name) == digest, f"Unsupported game file: {name}")
     api = args.developer_api.resolve(strict=True)
     check(sha(api / "APIShared.dll") == expected["APISharedReference"], "Developer APIShared mismatch.")
-    check(sha(args.public_api) == expected_release["APISharedReference"], "Public APIShared mismatch.")
     locales = sorted((api / "Locales").glob("*.txt"))
     check(len(locales) == 21, "Incomplete developer APIShared locales.")
     overlay = ["APIShared.dll", "APIShared.Content.dll", "info.json",
@@ -124,8 +122,6 @@ def prepare(args) -> None:
         check(sha(destination) == sha(api / name), f"Provider copy failed: {name}")
     for name, digest in checks.items():
         check(sha(incoming / name) == digest, f"Game copy failed: {name}")
-    release_ref = RUNTIME / "public-api.dll"
-    shutil.copyfile(args.public_api, release_ref)
     incoming.replace(GAME)
     write_json(RUNTIME / "prepared.json", {
         "game_files": checks,
@@ -157,20 +153,19 @@ def index_sources() -> None:
 
 def build() -> None:
     prepared = read_json(RUNTIME / "prepared.json")
-    for profile in ("release", "qa"):
-        api = RUNTIME / "public-api.dll" if profile == "release" else PLUGINS / "APIShared_Serp/APIShared.dll"
-        command = [sys.executable, "-B", str(ROOT / "build.py"),
-                   "--source-root", str(ROOT / "src"), "--source-index", str(ROOT / "source-index.json"),
-                   "--game-dir", str(GAME), "--loader-dir", str(GAME),
-                   "--extender-dir", str(PLUGINS / "000shcdese"), "--api-shared", str(api),
-                   "--sdk", prepared["sdk"], "--framework-refs", prepared["framework_refs"],
-                   "--dependency-lock", str(ROOT / "references" / (profile + ".json")),
-                   "--output-dir", str(ROOT / "build"), "--assembly-name", "StrongholdEuropeDiplomacy",
-                   "--root-namespace", "StrongholdEuropeDE.Runtime", "--version", VERSION,
-                   "--assembly-version", VERSION + ".0", "--file-version", VERSION + ".0",
-                   "--profile", profile, "--build"]
-        subprocess.run(command, cwd=ROOT, check=True)
-
+    profile = "qa"
+    api = PLUGINS / "APIShared_Serp/APIShared.dll"
+    command = [sys.executable, "-B", str(ROOT / "build.py"),
+               "--source-root", str(ROOT / "src"), "--source-index", str(ROOT / "source-index.json"),
+               "--game-dir", str(GAME), "--loader-dir", str(GAME),
+               "--extender-dir", str(PLUGINS / "000shcdese"), "--api-shared", str(api),
+               "--sdk", prepared["sdk"], "--framework-refs", prepared["framework_refs"],
+               "--dependency-lock", str(ROOT / "references" / (profile + ".json")),
+               "--output-dir", str(ROOT / "build"), "--assembly-name", "StrongholdEuropeDiplomacy",
+               "--root-namespace", "StrongholdEuropeDE.Runtime", "--version", VERSION,
+               "--assembly-version", VERSION + ".0", "--file-version", VERSION + ".0",
+               "--profile", profile, "--build"]
+    subprocess.run(command, cwd=ROOT, check=True)
 
 def module_id(path: Path) -> str:
     env = dict(os.environ, DIPLOMACY_METADATA_DLL=str(path))
@@ -273,7 +268,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser("prepare")
-    for argument in ("template", "developer-api", "public-api", "sdk", "framework-refs"):
+    for argument in ("template", "developer-api", "sdk", "framework-refs"):
         setup.add_argument("--" + argument, required=True, type=Path)
     for command in ("index", "build", "install", "check", "play"):
         commands.add_parser(command)

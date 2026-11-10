@@ -1,3 +1,4 @@
+#if DIPLOMACY_PRIVATE_TESTS
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -511,3 +512,4 @@ namespace StrongholdEuropeDE.Runtime
         private static extern uint GetModuleFileName(IntPtr module, StringBuilder path, uint capacity);
     }
 }
+#endif

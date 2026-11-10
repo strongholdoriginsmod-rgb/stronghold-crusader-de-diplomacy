@@ -2,6 +2,9 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+#if !DIPLOMACY_PRIVATE_TESTS
+using APIShared.Presentation;
+#endif
 using BepInEx;
 using CrusaderDE;
 using HarmonyLib;
@@ -26,9 +29,11 @@ namespace StrongholdEuropeDE.Diplomatie
     [BepInDependency(PrivateProfileBootstrap.PluginId)]
     [BepInDependency("APIShared_Serp", "0.25.0")]
 #else
-    [BepInDependency("APIShared_Serp", "0.16.3")]
+    [BepInDependency("APIShared_Serp", GeneratedPublicBuildDependencies.ApiSharedMinimum)]
 #endif
+#if DIPLOMACY_PRIVATE_TESTS
     [BepInDependency("BugfixesAndQoL_Serp", "1.0.192")]
+#endif
     public sealed class DiplomatiePlugin : BaseUnityPlugin
     {
         internal const string PluginId = StrongholdEuropeDE.Runtime.CompatibilityContracts.PluginId;
@@ -38,10 +43,15 @@ namespace StrongholdEuropeDE.Diplomatie
         private Harmony _harmony;
         private ExtensionFeatureHost _extensionHost;
         private DiplomacyFeature _diplomacy;
+#if DIPLOMACY_PRIVATE_TESTS
         private GameObject _hostObject;
         private DiplomatiePersistentHost _host;
+#else
+        private IUiFrameWorkRegistration _frameWork;
+#endif
         private bool _terminalLogged;
         private bool _featureFailureLogged;
+        private bool _frameEvidenceLogged;
         private bool _shuttingDown;
         private bool _applicationQuitting;
         private bool _rosterDiagnoseGeschrieben;
@@ -51,8 +61,8 @@ namespace StrongholdEuropeDE.Diplomatie
         {
             try
             {
-                UnityObject.DontDestroyOnLoad(gameObject);
 #if DIPLOMACY_PRIVATE_TESTS
+                UnityObject.DontDestroyOnLoad(gameObject);
                 if (!PrivateProfileBootstrap.Ready ||
                     !PrivateProfileRouting.Install(message => Logger.LogInfo(message)))
                 {
@@ -132,6 +142,12 @@ namespace StrongholdEuropeDE.Diplomatie
                     return;
                 }
 
+#if !DIPLOMACY_PRIVATE_TESTS
+                // The APIShared publisher survives Unity's startup cleanup of the BepInEx object.
+                if (!APIShared.ApiShared.ForMod(PluginId).Ui.TryRegisterBeforeRender(
+                        "diplomacy-frame", DiplomatieTick, out _frameWork, out string frameFailure))
+                    throw new InvalidOperationException("Diplomacy frame work unavailable: " + frameFailure);
+#endif
                 _extensionHost.ActivateAll();
                 ExtensionFeatureSnapshot snapshot = FindSnapshot(FeatureId);
                 if (snapshot == null || snapshot.State != ExtensionFeatureState.Active)
@@ -143,8 +159,15 @@ namespace StrongholdEuropeDE.Diplomatie
                 }
 
                 _diplomacy = candidate;
+#if DIPLOMACY_PRIVATE_TESTS
                 CreatePersistentHost();
+#else
+                _frameWork.SetContinuous(true);
+#endif
                 LogTerminal("active", null);
+#if SERP_DEVDIAG
+                _diplomacy.StartDiagnosticAcceptance(Logger);
+#endif
             }
             catch (Exception exception)
             {
@@ -166,6 +189,12 @@ namespace StrongholdEuropeDE.Diplomatie
             try
             {
                 _extensionHost.TickAll();
+                if (!_frameEvidenceLogged && _diplomacy != null && _diplomacy.HasActiveMissionTick)
+                {
+                    _frameEvidenceLogged = true;
+                    Logger.LogInfo(RuntimeLogPrefix + "|event=runtime_frame|status=active_mission_ticked|time=" +
+                        DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                }
                 ExtensionFeatureSnapshot snapshot = FindSnapshot(FeatureId);
                 // Die eigentliche Feature-Referenz muss bis zum sicheren
                 // Shutdown erhalten bleiben. RequiresFailClosedHooks kann nur
@@ -266,6 +295,7 @@ namespace StrongholdEuropeDE.Diplomatie
             ShutdownAndRollback("application quit");
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         internal void DiplomatieHostDestroyed(bool applicationQuitting)
         {
             _applicationQuitting = _applicationQuitting || applicationQuitting;
@@ -308,6 +338,8 @@ namespace StrongholdEuropeDE.Diplomatie
             }
         }
 
+#endif
+
         private void ShutdownAndRollback(string reason)
         {
             if (_shuttingDown)
@@ -316,6 +348,9 @@ namespace StrongholdEuropeDE.Diplomatie
             }
 
             _shuttingDown = true;
+#if !DIPLOMACY_PRIVATE_TESTS
+            _frameWork?.SetContinuous(false);
+#endif
 #if DIPLOMACY_PRIVATE_TESTS && HOST_DIRECTED_AI_TRIBE_CANARY && ORIGINAL_POSTTICK_INSTALL_EXPLICITLY_AUTHORIZED
             // Atomically render the passive worker callback inert before any
             // feature rollback or process-exit fast path, never live-Unpatch.
@@ -397,6 +432,7 @@ namespace StrongholdEuropeDE.Diplomatie
                 }
             }
 
+#if DIPLOMACY_PRIVATE_TESTS
             if (!IsUnityNull(_hostObject))
             {
                 try
@@ -411,6 +447,7 @@ namespace StrongholdEuropeDE.Diplomatie
 
             _hostObject = null;
             _host = null;
+#endif
         }
 
         private ExtensionFeatureSnapshot FindSnapshot(string id)
@@ -502,9 +539,11 @@ namespace StrongholdEuropeDE.Diplomatie
             return value.Replace('|', ' ').Replace('\r', ' ').Replace('\n', ' ');
         }
 
+#if DIPLOMACY_PRIVATE_TESTS
         private static bool IsUnityNull(UnityObject value)
         {
             return value == null;
         }
+#endif
     }
 }
